@@ -1,50 +1,62 @@
-# Merge Please
+# YOLO Merge
 
-**Papers, Please** meets code review. **Cursor Agent** sends pull requests — you stamp **MERGE** or **BLOCK** before the timer runs out.
-
-- Buggy code → **BLOCK** · Clean code → **MERGE**
-- 3 lives, 20s per PR, combo streaks, SEV-1 boss rounds (every 5th)
-- AI-generated PR titles, authors, roasts, and praise
+**Ship it live.** A satirical merge-to-prod clicker dressed up like Cursor — mash merge, ignore Undo All, unlock badges, and climb from Junior Merge Intern to Chief Merge Officer.
 
 Built for the Cursor hackathon in SF.
 
-## Play (recommended)
-
-Uses the Cursor SDK locally — your API key stays on the server, not in the browser.
+## Play
 
 ```bash
-export CURSOR_API_KEY="cursor_..."   # Cursor Dashboard → Integrations → API Keys
+cp .env.example .env   # optional — or export CURSOR_API_KEY directly
 npm install
 npm start
 ```
 
-Open http://localhost:8765 and hit **Start Game**. No key prompt in the UI.
+Open [http://localhost:8765](http://localhost:8765). On first visit you get the CEO all-hands intro. Hit **Intro** in the header to replay it.
 
-## Offline / no server
+### Cursor API key (optional)
 
-Open `index.html` directly (or any static host) and the game falls back to 10 built-in puzzles. The status line tells you which mode you're in.
+With a key, the **Cursor Agent** generates fresh roasts, hype lines, and PR titles. Without one, the game uses built-in fallback copy and works fully offline.
 
-## How it works
-
-```
-Browser (index.html)  →  POST /api/round  →  server.mjs
-                                              ↓
-                                    Agent.prompt() via @cursor/sdk
-                                    model: composer-2.5, local runtime
+```bash
+export CURSOR_API_KEY="cursor_..."   # Cursor Dashboard → Integrations → API Keys
 ```
 
-The server reads `CURSOR_API_KEY` from your environment. The frontend never sees it.
+The key stays on the server (`server.mjs` reads `.env` or the environment). The browser never sees it.
 
-## Files
+## How to play
+
+- **Merge** — click the send button or press **Space** (also **Merge to Prod** pill)
+- **Undo All / Review** — wrong buttons; you get roasted, badges, and story beats
+- **Velocity upgrades** — spend merged PRs on auto-merge bots, skip CI, disable branch protection
+- **Badges** — open the **Badges** panel to see achievements (15 total)
+- **Story** — CEO Chad and CTO Dana interrupt at milestones
+
+Progress (badges, story, intro) is saved in `localStorage`.
+
+## Architecture
+
+```
+Browser (index.html)
+  → POST /api/line   →  server.mjs  →  Agent.prompt() via @cursor/sdk
+  → GET  /api/health     (composer-2.5, local runtime)
+```
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/health` | Server status + whether Cursor API is configured |
+| `POST /api/line` | Agent-generated line for merge / reject / review / levelup / badge |
+
+## Project layout
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Game UI + client logic |
-| `server.mjs` | Static host + Cursor Agent puzzle generator |
+| `index.html` | Game UI, idle loop, badges, story, upgrades |
+| `server.mjs` | Static file host + Cursor Agent line generator |
 | `package.json` | `@cursor/sdk` dependency |
-| `.env.example` | Example env var (copy to `.env` if you use one) |
-| `Design doc` | Original spec |
+| `.env.example` | Example env vars |
+| `Design doc` | Original design notes |
 
-## Dev tip
+## License
 
-Set `const ROUNDS = 3` in `index.html` while iterating; restore to `10` before the demo.
+MIT — hackathon project, merge responsibly.
