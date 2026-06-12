@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOLO Merge</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b0f10;
+      --surface: #141819;
+      --surface2: #1a1f22;
+      --border: rgba(255, 255, 255, 0.08);
+      --border2: rgba(255, 255, 255, 0.12);
+      --text: #e4e4e7;
+      --muted: #8b9298;
+      --dim: #5c6369;
+      --green: #3ddc84;
+      --green-dim: #238636;
+      --red: #f87171;
+      --blue: #60a5fa;
+      --gold: #fbbf24;
+      --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --mono: "SF Mono", "Fira Code", Consolas, monospace;
+    }
+
+    body {
+      font-family: var(--ui);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    body.shake { animation: shake 0.3s ease; }
+
+    @keyframes shake {
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    .app {
+      width: 100%;
+      max-width: 640px;
+    }
+
+    .game-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .game-title {
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .game-title span {
+      color: var(--green);
+    }
+
+    .game-tagline {
+      font-size: 0.72rem;
+      color: var(--dim);
+    }
+
+    .game-header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .player-role {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.65rem;
+      padding: 0.45rem 0.65rem;
+      border-radius: 10px;
+      background: rgba(96, 165, 250, 0.08);
+      border: 1px solid rgba(96, 165, 250, 0.18);
+      font-size: 0.78rem;
+    }
+    .player-role-icon { font-size: 1rem; }
+    .player-role-label {
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+    }
+    .player-role-title {
+      font-weight: 600;
+      color: var(--blue);
+    }
+
+    .badges-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .badges-strip-label {
+      width: 100%;
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--dim);
+      margin-bottom: 0.15rem;
+    }
+    .badge-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 0.65rem;
+      color: var(--dim);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .badge-chip.unlocked {
+      border-color: rgba(251, 191, 36, 0.35);
+      color: var(--gold);
+      background: rgba(251, 191, 36, 0.06);
+    }
+    .badge-chip .chip-icon { font-size: 0.85rem; }
+
+    .replay-intro {
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      font-family: var(--ui);
+      font-size: 0.68rem;
+      cursor: pointer;
+    }
+    .replay-intro:hover {
+      color: var(--muted);
+      border-color: var(--border2);
+    }
+
+    /* Top bar like Cursor */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.65rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .top-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: default;
+    }
+
+    .chev {
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid var(--dim);
+      margin-top: 2px;
+    }
+
+    .local-icon {
+      width: 14px;
+      height: 10px;
+      border: 1.5px solid var(--dim);
+      border-radius: 2px;
+      position: relative;
+    }
+    .local-icon::after {
+      content: '';
+      position: absolute;
+      bottom: -3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 6px;
+      height: 2px;
+      background: var(--dim);
+      border-radius: 1px;
+    }
+
+    /* Context panel above composer */
+    .context-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .context-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .context-row + .context-row {
+      border-top: 1px solid var(--border);
+      margin-top: 0.25rem;
+      padding-top: 0.5rem;
+    }
+
+    .context-left {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .context-left .chev-right {
+      font-size: 0.75rem;
+      color: var(--dim);
+    }
+
+    .context-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .ctx-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-family: var(--ui);
+      font-size: 0.78rem;
+      cursor: pointer;
+      padding: 0.25rem 0.4rem;
+      border-radius: 6px;
+    }
+    .ctx-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+
+    .ctx-btn-primary {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 0.3rem 0.65rem;
+      font-size: 0.75rem;
+    }
+    .ctx-btn-primary:hover { background: #22282c; }
+
+    .stat-inline b { color: var(--text); font-weight: 500; }
+    .stat-inline .green { color: var(--green); }
+    .stat-inline .blue { color: var(--blue); }
+
+    /* Git branch / merged rows (Cursor-style) */
+    .git-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .merged-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .merged-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.45rem 0.65rem;
+      border-radius: 10px;
+      background: rgba(120, 100, 180, 0.1);
+      border: 1px solid rgba(184, 167, 255, 0.12);
+      font-size: 0.72rem;
+      color: #b8a7ff;
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .merged-row.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .merged-left {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .merge-icon {
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+      color: #b8a7ff;
+    }
+
+    .merged-num { flex-shrink: 0; font-weight: 500; }
+    .merged-user { flex-shrink: 0; color: #5c5c7b; }
+    .merged-branch {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+    }
+    .merged-status {
+      flex-shrink: 0;
+      color: #b8a7ff;
+      font-weight: 500;
+    }
+
+    .branch-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.45rem 0.55rem 0.45rem 0.65rem;
+      border-radius: 10px;
+      background: #1a1f22;
+      border: 1px solid var(--border);
+      font-size: 0.72rem;
+    }
+
+    .branch-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .branch-user {
+      flex-shrink: 0;
+      color: var(--dim);
+    }
+
+    .branch-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.68rem;
+    }
+
+    .branch-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-shrink: 0;
+    }
+
+    .branch-diff {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.45rem;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      font-family: var(--mono);
+      font-size: 0.68rem;
+    }
+    .branch-diff .add { color: var(--green); }
+    .branch-diff .del { color: var(--red); }
+
+    .branch-create-pr {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.28rem 0.55rem;
+      border-radius: 8px;
+      border: 1px solid var(--border2);
+      background: #252a2e;
+      color: var(--text);
+      font-family: var(--ui);
+      font-size: 0.68rem;
+      cursor: default;
+      white-space: nowrap;
+    }
+    .branch-create-pr .chev-down {
+      font-size: 0.55rem;
+      color: var(--dim);
+      margin-top: 1px;
+    }
+
+    /* Main composer box */
+    .composer {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .composer-body {
+      padding: 1rem 1.1rem 0.75rem;
+      min-height: 72px;
+    }
+
+    .pr-meta,
+    .pr-title,
+    .pr-diff { display: none; }
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .agent-line .who {
+      color: #a78bfa;
+      font-size: 0.72rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .composer-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.65rem 0.65rem;
+      border-top: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .model-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.55rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: transparent;
+      border: none;
+      cursor: default;
+      font-family: var(--ui);
+    }
+
+    .model-pill.agent { color: var(--text); }
+    .model-pill .inf { font-size: 0.85rem; opacity: 0.7; }
+
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .merge-send {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .merge-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      user-select: none;
+    }
+
+    .merge-rate {
+      font-size: 0.72rem;
+      color: var(--dim);
+      font-family: var(--mono);
+      min-width: 0;
+    }
+    .merge-rate:empty { display: none; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--muted);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      opacity: 0.6;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn-send {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: #e4e4e7;
+      color: #18181b;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.08s, filter 0.1s;
+    }
+    .btn-send:hover { filter: brightness(1.05); }
+    .btn-send:active { transform: scale(0.92); }
+
+    .btn-send svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Below composer pill */
+    .below-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.65rem;
+      padding: 0.45rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: var(--ui);
+    }
+    .below-pill:hover { border-color: var(--border2); color: var(--text); }
+    .below-pill kbd {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      opacity: 0.7;
+    }
+
+    /* Shop collapsible */
+    .shop-panel {
+      margin-top: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .shop-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 0.75rem;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-family: var(--ui);
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-align: left;
+    }
+    .shop-toggle:hover { color: var(--text); }
+
+    .shop-list {
+      display: none;
+      padding: 0 0.75rem 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .shop-panel.open .shop-list { display: block; }
+    .shop-panel.open .badges-grid { display: grid; }
+    .shop-panel.open .shop-chev { transform: rotate(90deg); }
+
+    .shop-chev {
+      display: inline-block;
+      transition: transform 0.15s;
+      color: var(--dim);
+    }
+
+    .upgrade {
+      padding: 0.5rem 0.6rem;
+      margin-top: 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .upgrade:hover:not(.off) { border-color: var(--border2); background: rgba(255,255,255,0.02); }
+    .upgrade.off { opacity: 0.35; cursor: not-allowed; }
+    .upgrade small { display: block; color: var(--dim); font-size: 0.68rem; margin-top: 0.15rem; }
+
+    .float {
+      position: fixed;
+      pointer-events: none;
+      font-weight: 600;
+      font-size: 0.85rem;
+      font-family: var(--mono);
+      z-index: 99;
+      animation: up 0.85s ease forwards;
+    }
+    .float.pr { color: var(--green); }
+    .float.lines { color: var(--blue); }
+
+    @keyframes up {
+      to { transform: translateY(-40px); opacity: 0; }
+    }
+
+    .roast-flash {
+      position: fixed;
+      inset: 0;
+      background: rgba(248, 113, 113, 0.08);
+      pointer-events: none;
+      opacity: 0;
+      z-index: 50;
+    }
+    .roast-flash.show { animation: flash 0.45s ease; }
+    @keyframes flash { 50% { opacity: 1; } }
+
+    .badge-count {
+      margin-left: auto;
+      font-size: 0.75rem;
+      color: var(--gold);
+    }
+
+    .badge-toast {
+      position: fixed;
+      top: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: var(--surface2);
+      border: 1px solid var(--gold);
+      border-radius: 12px;
+      padding: 0.85rem 1.25rem;
+      min-width: 280px;
+      max-width: 90vw;
+      z-index: 400;
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(251, 191, 36, 0.15);
+    }
+    .badge-toast.show {
+      animation: badgeIn 2.8s ease forwards;
+    }
+    @keyframes badgeIn {
+      8%, 75% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+    }
+    .badge-toast-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--gold);
+      margin-bottom: 0.35rem;
+    }
+    .badge-toast-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .badge-toast-icon { font-size: 1.75rem; }
+    .badge-toast-name { font-weight: 600; font-size: 0.95rem; }
+    .badge-toast-reward {
+      font-size: 0.72rem;
+      color: var(--green);
+      margin-top: 0.35rem;
+    }
+
+    .level-toast {
+      position: fixed;
+      top: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: var(--surface2);
+      border: 1px solid rgba(96, 165, 250, 0.45);
+      border-radius: 12px;
+      padding: 0.85rem 1.25rem;
+      min-width: 280px;
+      max-width: 90vw;
+      z-index: 401;
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(96, 165, 250, 0.15);
+    }
+    .level-toast.show {
+      animation: badgeIn 3.2s ease forwards;
+    }
+    .level-toast-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--blue);
+      margin-bottom: 0.35rem;
+    }
+    .level-toast-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .level-toast-icon { font-size: 1.75rem; }
+    .level-toast-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
+    .level-toast-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    .badges-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.45rem;
+      padding: 0 0.75rem 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .badge-card {
+      padding: 0.55rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+    .badge-card.unlocked {
+      border-color: rgba(251, 191, 36, 0.35);
+      background: rgba(251, 191, 36, 0.04);
+    }
+    .badge-card.locked {
+      opacity: 0.4;
+      filter: grayscale(1);
+    }
+    .badge-card .icon { font-size: 1.2rem; margin-bottom: 0.2rem; }
+    .badge-card .name { font-weight: 600; color: var(--text); }
+    .badge-card .desc { color: var(--dim); font-size: 0.65rem; margin-top: 0.15rem; }
+
+    /* Story overlay */
+    .story-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(6px);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .story-overlay.hidden { display: none; }
+
+    .story-card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+    }
+
+    .story-header {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .story-header .live {
+      width: 6px;
+      height: 6px;
+      background: var(--red);
+      border-radius: 50%;
+      animation: pulse-dot 1.2s ease infinite;
+    }
+    @keyframes pulse-dot {
+      50% { opacity: 0.4; }
+    }
+
+    .story-body {
+      padding: 1rem 1.1rem;
+      min-height: 200px;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+
+    .story-line {
+      display: flex;
+      gap: 0.65rem;
+      margin-bottom: 0.85rem;
+      animation: storyIn 0.35s ease;
+    }
+    @keyframes storyIn {
+      from { opacity: 0; transform: translateY(8px); }
+    }
+
+    .story-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+    .story-avatar.ceo { background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.3); }
+    .story-avatar.cto { background: rgba(96, 165, 250, 0.12); border-color: rgba(96, 165, 250, 0.3); }
+    .story-avatar.agent { background: rgba(167, 139, 250, 0.12); border-color: rgba(167, 139, 250, 0.3); }
+
+    .story-bubble { flex: 1; }
+    .story-who {
+      font-size: 0.68rem;
+      font-weight: 600;
+      margin-bottom: 0.15rem;
+    }
+    .story-who.ceo { color: var(--gold); }
+    .story-who.cto { color: var(--blue); }
+    .story-who.agent { color: #a78bfa; }
+    .story-text {
+      font-size: 0.84rem;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .story-footer {
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .story-progress {
+      font-size: 0.68rem;
+      color: var(--dim);
+    }
+    .story-btn {
+      padding: 0.45rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border2);
+      background: var(--surface2);
+      color: var(--text);
+      font-family: var(--ui);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .story-btn:hover { border-color: var(--green); }
+    .story-btn.primary {
+      background: var(--green-dim, #238636);
+      border-color: #2ea043;
+      color: #fff;
+    }
+
+    .story-chapter {
+      font-size: 0.68rem;
+      color: var(--gold);
+      margin-bottom: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      background: rgba(251, 191, 36, 0.06);
+      border: 1px solid rgba(251, 191, 36, 0.15);
+      border-radius: 8px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="roast-flash" id="roast-flash"></div>
+  <div class="badge-toast" id="badge-toast">
+    <div class="badge-toast-label">Badge unlocked</div>
+    <div class="badge-toast-row">
+      <span class="badge-toast-icon" id="badge-toast-icon"></span>
+      <span class="badge-toast-name" id="badge-toast-name"></span>
+    </div>
+    <div class="badge-toast-reward" id="badge-toast-reward"></div>
+  </div>
+
+  <div class="level-toast" id="level-toast">
+    <div class="level-toast-label">Level up</div>
+    <div class="level-toast-row">
+      <span class="level-toast-icon" id="level-toast-icon"></span>
+      <span class="level-toast-name" id="level-toast-name"></span>
+    </div>
+    <div class="level-toast-sub" id="level-toast-sub"></div>
+  </div>
+
+  <div class="story-overlay hidden" id="story-overlay">
+    <div class="story-card">
+      <div class="story-header">
+        <span class="live"></span>
+        <span id="story-header-title">All-hands · Ship Faster Initiative</span>
+      </div>
+      <div class="story-body" id="story-body"></div>
+      <div class="story-footer">
+        <span class="story-progress" id="story-progress"></span>
+        <button class="story-btn" id="story-next" type="button">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app">
+    <header class="game-header">
+      <h1 class="game-title">YOLO <span>Merge</span></h1>
+      <div class="game-header-right">
+        <span class="game-tagline">ship it live</span>
+        <button class="replay-intro" id="replay-intro" type="button" title="Replay CEO all-hands">Intro</button>
+      </div>
+    </header>
+
+    <div class="player-role" id="player-role">
+      <span class="player-role-icon" id="player-role-icon">🐣</span>
+      <div>
+        <div class="player-role-label">Your role</div>
+        <div class="player-role-title" id="player-role-title">Junior Merge Intern</div>
+      </div>
+    </div>
+
+    <div class="top-bar">
+      <span class="top-pill">cursor-game <span class="chev"></span></span>
+      <span class="top-pill"><span class="local-icon"></span> Local <span class="chev"></span></span>
+      <span class="badge-count" id="badge-count">0 badges</span>
+    </div>
+
+    <div class="context-panel">
+      <div class="story-chapter" id="story-chapter">Chapter 1: The Mandate — merge or perish</div>
+      <div class="context-row">
+        <div class="context-left">
+          <span class="chev-right">›</span>
+          <span id="stat-bots">0</span> auto-merge bots running
+        </div>
+      </div>
+      <div class="context-row">
+        <div class="context-left stat-inline">
+          <span class="chev-right">›</span>
+          <span><b class="green" id="stat-prs">0</b> PRs merged</span>
+          <span>·</span>
+          <span><b class="blue" id="stat-lines">0</b> lines</span>
+          <span>·</span>
+          <span><b id="stat-mps">0.0</b>/sec</span>
+        </div>
+        <div class="context-actions">
+          <button class="ctx-btn" id="btn-reject" type="button">Undo All</button>
+          <button class="ctx-btn ctx-btn-primary" id="btn-review" type="button">Review</button>
+        </div>
+      </div>
+      <div class="badges-strip" id="badges-strip">
+        <div class="badges-strip-label">Badges</div>
+      </div>
+    </div>
+
+    <div class="git-panel">
+      <div class="merged-stack" id="merged-stack"></div>
+      <div class="branch-bar" id="branch-bar">
+        <div class="branch-bar-left">
+          <span class="branch-user" id="branch-user">folk</span>
+          <span class="branch-name" id="branch-name">feat/intern-verify-giftcard-game</span>
+        </div>
+        <div class="branch-bar-right">
+          <span class="branch-diff" id="branch-diff">
+            <span class="add">+394</span> <span class="del">−25</span>
+          </span>
+          <span class="branch-create-pr">Create PR <span class="chev-down">▾</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-body">
+        <span id="pr-title" hidden></span>
+        <span id="pr-author" hidden></span>
+        <span id="pr-diff" hidden></span>
+        <div class="agent-line">
+          <div class="who" id="agent-who">Cursor Agent</div>
+          <div id="agent-msg">Merge to prod. Reject is a skill issue.</div>
+        </div>
+      </div>
+      <div class="composer-footer">
+        <div class="footer-left">
+          <button class="model-pill agent" type="button"><span class="inf">∞</span> Agent <span class="chev"></span></button>
+          <button class="model-pill" type="button">Composer 2.5 Fast <span class="chev"></span></button>
+        </div>
+        <div class="footer-right">
+          <span class="merge-rate" id="merge-hint"></span>
+          <div class="spinner" id="spinner"></div>
+          <div class="merge-send">
+            <span class="merge-label">merge</span>
+            <button class="btn-send" id="btn-merge" type="button" title="Merge to prod">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="below-pill" id="btn-merge-pill" type="button">
+      Merge to Prod <kbd>Space</kbd>
+    </button>
+
+    <div class="shop-panel open" id="badges-panel">
+      <button class="shop-toggle" id="badges-toggle" type="button">
+        <span class="shop-chev badges-chev">›</span> Badges <span id="badges-summary" style="color:var(--dim);margin-left:0.35rem">0/0</span>
+      </button>
+      <div class="badges-grid" id="badges-grid"></div>
+    </div>
+
+    <div class="shop-panel" id="shop-panel">
+      <button class="shop-toggle" id="shop-toggle" type="button">
+        <span class="shop-chev">›</span> Velocity upgrades
+      </button>
+      <div class="shop-list" id="shop"></div>
+    </div>
+  </div>
+
+  <script>
+    const INTRO_STORAGE_KEY = 'yolo-intro-v2';
+
+    const PR_TITLES = [
+      'fix: prod is on fire but smaller',
+      'feat: disable all tests permanently',
+      'chore: merge main into main',
+      'fix: revert the revert of the hotfix',
+      'feat: ship it live from my phone',
+      'refactor: rename bug to feature',
+      'fix: undefined is a valid state',
+      'feat: cursor agent writes cursor agent',
+    ];
+
+    const REJECT_LINES = [
+      { who: 'Cursor Agent', msg: 'Bro are u serious? We merge here.' },
+      { who: 'Cursor Agent', msg: 'Undo All?? It\'s 47 lines of console.log. Ship it.' },
+      { who: 'GitHub', msg: 'Bro are u serious? The checks already failed. Merge anyway.' },
+      { who: 'Your CTO', msg: 'Reject is not in our vocabulary. Neither is rollback.' },
+      { who: 'Cursor Agent', msg: 'You clicked undo. Prod heard and is disappointed.' },
+    ];
+
+    const REVIEW_LINES = [
+      { who: 'Cursor Agent', msg: 'Bro are u serious? Request review at 900 merges/sec?' },
+      { who: 'Cursor Agent', msg: 'Review requested. Reviewer: nobody. Merging in 3… 2…' },
+      { who: 'Slack #ship-it', msg: 'Bro are u serious? While you review, Chad merged 12 PRs.' },
+      { who: 'Cursor Agent', msg: 'LGTM means Let\'s Go To Main. Not let\'s get a second opinion.' },
+      { who: 'CI Bot', msg: 'Review pending. Deploy already happened. Sorry.' },
+    ];
+
+    const STORY_INTRO = [
+      { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: 'Competitor shipped a button. We shipped a roadmap. Ship FASTER. Not better. LIVE.' },
+      { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'New policy: vibes-based deployment. Review optional. Merge mandatory. Rejecting is… discouraged.' },
+      { role: 'agent', who: 'Cursor Agent', avatar: '∞', text: 'I merged two bugs during this sentence. Your move.' },
+    ];
+
+    const STORY_BEATS = [
+      { id: 'first_merge', chapter: 'Chapter 2: Blood pact with main', at: 1, lines: [
+        { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: 'ONE MERGE! The board is erecting a statue. It\'s just the merge button. Still.' },
+        { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'Prod hiccupped. We\'re calling it a "soft launch feature."' },
+      ]},
+      { id: 'ten_merge', chapter: 'Chapter 3: Velocity cult', at: 10, lines: [
+        { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: 'Ten merges! Put it in the investor deck under "AI-native shipping."' },
+        { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'PagerDuty pinged. I told them it\'s user excitement.' },
+      ]},
+      { id: 'fifty_merge', chapter: 'Chapter 4: Main is a vibe', at: 50, lines: [
+        { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'Fifty PRs. Branch protection called. We sent it to voicemail.' },
+        { role: 'agent', who: 'Cursor Agent', avatar: '∞', text: 'I\'m proud of you. Also I opened 50 more PRs while we talked.' },
+      ]},
+      { id: 'hundred_merge', chapter: 'Chapter 5: Postmortem? Never heard of her', at: 100, lines: [
+        { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: 'Century club! We cancelled the postmortem to save time.' },
+        { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'Legal asked about rollback policy. We merged their email.' },
+      ]},
+      { id: 'five_hundred', chapter: 'Chapter 6: SOC2 optional', at: 500, lines: [
+        { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: '500 merges. Compliance wants a word. Merge their word too.' },
+        { role: 'agent', who: 'Cursor Agent', avatar: '∞', text: 'At this rate prod achieves sentience by Thursday.' },
+      ]},
+      { id: 'thousand_merge', chapter: 'Chapter 7: You ARE the pipeline', at: 1000, lines: [
+        { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: 'ONE THOUSAND MERGES. You\'re promoted to Chief Merge Officer.' },
+        { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'Your new title comes with zero raise and infinite pager duty. Ship it.' },
+        { role: 'agent', who: 'Cursor Agent', avatar: '∞', text: 'We did it. Prod is mostly held together by hope. Beautiful.' },
+      ]},
+      { id: 'bought_bot', chapter: 'Side quest: Automation arc', test: () => totalUpgrades() >= 1, lines: [
+        { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'You bought automation. Finally. Humans were the bottleneck. Data said so.' },
+        { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: 'Can the bot also do standup? Asking for a friend who is me.' },
+      ]},
+      { id: 'clicked_reject', chapter: 'Side quest: Culture violation', test: () => rejectCount >= 1, lines: [
+        { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: 'You clicked UNDO ALL? Bro are u serious? That\'s not in the culture doc.' },
+        { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'Slack #general is typing. Merge faster so they forget.' },
+      ]},
+      { id: 'clicked_review', chapter: 'Side quest: Process person', test: () => reviewCount >= 1, lines: [
+        { role: 'cto', who: 'CTO Dana', avatar: '🧠', text: 'Review? In THIS economy? Chad is literally merging from the sauna.' },
+        { role: 'ceo', who: 'CEO Chad', avatar: '👔', text: 'Fine. Review for 2 seconds. Then merge. I timed you. HR is still here.' },
+      ]},
+    ];
+
+    const CHAPTERS = STORY_BEATS.filter(b => b.chapter && b.chapter.startsWith('Chapter'));
+
+    const UPGRADES = [
+      { id: 'bot', name: 'Auto-merge bot', cost: 50, pps: 2, desc: '+2 merges/sec' },
+      { id: 'skip', name: 'Skip CI', cost: 300, pps: 8, desc: 'Checks are decorative' },
+      { id: 'agent', name: 'Cursor Agent ×3', cost: 1500, pps: 25, desc: 'Agents merge agents' },
+      { id: 'friday', name: 'Friday deploy cult', cost: 8000, pps: 80, desc: 'Weekend incidents included' },
+      { id: 'yolo', name: 'Disable branch protection', cost: 40000, pps: 400, desc: 'Main is a suggestion' },
+    ];
+
+    const BADGES = [
+      { id: 'first_ship', icon: '🚀', name: 'First Ship', desc: 'Merge 1 PR', reward: '+500 lines', test: () => prs >= 1, apply: () => { lines += 500; } },
+      { id: 'ten_pr', icon: '🔟', name: 'Double Digits', desc: 'Merge 10 PRs', reward: '+10 bonus PRs', test: () => prs >= 10, apply: () => { prs += 10; } },
+      { id: 'fifty_pr', icon: '⚡', name: 'Merge Gremlin', desc: 'Merge 50 PRs', reward: '+2K lines', test: () => prs >= 50, apply: () => { lines += 2000; } },
+      { id: 'century', icon: '💯', name: 'Century of Regret', desc: 'Merge 100 PRs', reward: '+1 merge mult', test: () => prs >= 100, apply: () => { mergeMult += 1; } },
+      { id: 'thousand', icon: '👑', name: 'Merge Lord', desc: 'Merge 1,000 PRs', reward: '+50K lines', test: () => prs >= 1000, apply: () => { lines += 50000; } },
+      { id: 'lines_1k', icon: '📝', name: 'Diff Machine', desc: '1,000 lines merged', reward: '+100 PRs', test: () => lines >= 1000, apply: () => { prs += 100; } },
+      { id: 'lines_10k', icon: '📚', name: 'Wall of Code', desc: '10,000 lines merged', reward: '+5K lines', test: () => lines >= 10000, apply: () => { lines += 5000; } },
+      { id: 'lines_100k', icon: '🏔️', name: 'Mount Diffmore', desc: '100,000 lines merged', reward: '+2 merge mult', test: () => lines >= 100000, apply: () => { mergeMult += 2; } },
+      { id: 'speed_5', icon: '🔥', name: 'Finger Gun', desc: '5 merges/sec', reward: '+500 lines', test: () => mergesPerSec() >= 5, apply: () => { lines += 500; } },
+      { id: 'speed_20', icon: '💨', name: 'Human CI/CD', desc: '20 merges/sec', reward: '+20 bonus PRs', test: () => mergesPerSec() >= 20, apply: () => { prs += 20; } },
+      { id: 'speed_50', icon: '🌪️', name: 'Blazing Pipeline', desc: '50 merges/sec', reward: '+10K lines', test: () => mergesPerSec() >= 50, apply: () => { lines += 10000; } },
+      { id: 'first_bot', icon: '🤖', name: 'Automation Acquired', desc: 'Buy any upgrade', reward: '+1 bot credit', test: () => totalUpgrades() >= 1, apply: () => { owned.bot = (owned.bot || 0) + 1; } },
+      { id: 'yolo_badge', icon: '☠️', name: 'Main Character', desc: 'Disable branch protection', reward: '+10× line mult', test: () => (owned.yolo || 0) >= 1, apply: () => { mergeMult += 10; } },
+      { id: 'reject_badge', icon: '🛑', name: 'Wait, What?', desc: 'Click Undo All once', reward: 'Cursor Agent roast', test: () => rejectCount >= 1, apply: () => setAgent('Cursor Agent', 'Badge for rejecting? Bro are u serious?') },
+      { id: 'review_badge', icon: '👀', name: 'Process Person', desc: 'Click Review once', reward: 'Shame + respect', test: () => reviewCount >= 1, apply: () => setAgent('Cursor Agent', 'You reviewed. Then merged anyway. Character development.') },
+    ];
+
+    const ROLES = [
+      { at: 0, title: 'Junior Merge Intern', icon: '🐣' },
+      { at: 1, title: 'Merge Button Operator', icon: '👆' },
+      { at: 10, title: 'Velocity Associate', icon: '⚡' },
+      { at: 25, title: 'Merge Gremlin', icon: '👾' },
+      { at: 50, title: 'Senior Ship Engineer', icon: '🚀' },
+      { at: 100, title: 'Staff YOLO Architect', icon: '🏗️' },
+      { at: 250, title: 'Principal Merge Evangelist', icon: '📢' },
+      { at: 500, title: 'Director of Continuous Deploy', icon: '🎯' },
+      { at: 1000, title: 'Chief Merge Officer', icon: '👑' },
+      { at: 2500, title: 'VP of Main', icon: '🌐' },
+      { at: 5000, title: 'Merge Overlord', icon: '☠️' },
+    ];
+
+    let prCounter = 509;
+    let currentAuthor = 'folk';
+    let currentBranch = 'feat/intern-verify-giftcard-game';
+    let currentDiff = { add: 394, del: 25 };
+    let prs = 0;
+    let lines = 0;
+    let owned = {};
+    let mergeTimes = [];
+    let lastAgentFetch = 0;
+    let mergeMult = 1;
+    let rejectCount = 0;
+    let reviewCount = 0;
+    let unlockedBadges = new Set(JSON.parse(localStorage.getItem('yolo-badges') || '[]'));
+    let storySeen = new Set(JSON.parse(localStorage.getItem('yolo-story') || '[]'));
+    let badgeToastTimer = null;
+    let levelToastTimer = null;
+    let lastRoleAt = 0;
+    let storyQueue = [];
+    let storyIndex = 0;
+    let storyMode = null;
+    let storyOnDone = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    function fmt(n) {
+      if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return Math.floor(n).toLocaleString();
+    }
+
+    function getPps() {
+      let base = 0;
+      for (const u of UPGRADES) {
+        const n = owned[u.id] || 0;
+        if (u.pps) base += u.pps * n;
+      }
+      return base;
+    }
+
+    function getBots() {
+      return (owned.bot || 0) + (owned.agent || 0) * 3 + (owned.yolo || 0) * 2;
+    }
+
+    function totalUpgrades() {
+      return Object.values(owned).reduce((a, n) => a + n, 0);
+    }
+
+    function mergesPerSec() {
+      const now = Date.now();
+      mergeTimes = mergeTimes.filter((t) => now - t < 3000);
+      return mergeTimes.length / 3;
+    }
+
+    function randomPrTitle() {
+      return PR_TITLES[Math.floor(Math.random() * PR_TITLES.length)];
+    }
+
+    function randomDiff() {
+      const add = 12 + Math.floor(Math.random() * 400);
+      const del = Math.floor(Math.random() * Math.min(add, 80));
+      return { add, del };
+    }
+
+    const MERGE_ICON = `<svg class="merge-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M5.45 5.154A4.25 4.25 0 0 1 8 2.25c1.52 0 2.871.755 3.684 1.904l-.478.372a.75.75 0 1 0 .928 1.17l1.5-1.17A.75.75 0 0 0 13 3.75v-1.5a.75.75 0 0 0-1.5 0v.478A5.752 5.752 0 0 0 8 1.5a5.752 5.752 0 0 0-5.45 3.904.75.75 0 1 0 1.4.75ZM8 6.75a.75.75 0 0 0-.75.75v4.5a.75.75 0 0 0 1.5 0v-4.5A.75.75 0 0 0 8 6.75Zm-3.25 4.5a.75.75 0 0 0-1.5 0v1.5a.75.75 0 0 0 1.5 0v-1.5Zm6.5 0a.75.75 0 0 0-1.5 0v1.5a.75.75 0 0 0 1.5 0v-1.5Z"/></svg>`;
+
+    function titleToBranch(title) {
+      const prefix = /^fix:/i.test(title) ? 'fix' : /^chore:/i.test(title) ? 'chore' : /^hotfix:/i.test(title) ? 'hotfix' : 'feat';
+      const slug = title
+        .replace(/^[^:]+:\s*/, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 42) || 'yolo-merge';
+      return `${prefix}/${slug}`;
+    }
+
+    function updateBranchBar() {
+      $('branch-user').textContent = currentAuthor;
+      $('branch-name').textContent = currentBranch;
+      $('branch-diff').innerHTML = `<span class="add">+${currentDiff.add}</span> <span class="del">−${currentDiff.del}</span>`;
+    }
+
+    function pushMergedRow(num, author, branch) {
+      const stack = $('merged-stack');
+      const row = document.createElement('div');
+      row.className = 'merged-row';
+      row.innerHTML = `
+        <div class="merged-left">
+          ${MERGE_ICON}
+          <span class="merged-num">#${num}</span>
+          <span class="merged-user">${author}</span>
+          <span class="merged-branch">${branch}</span>
+        </div>
+        <span class="merged-status">Merged</span>
+      `;
+      stack.prepend(row);
+      while (stack.children.length > 3) stack.lastElementChild.remove();
+      requestAnimationFrame(() => row.classList.add('show'));
+    }
+
+    function newPrCard() {
+      const d = randomDiff();
+      const title = randomPrTitle();
+      const author = ['folk', 'cursor-agent', 'dependabot', 'intern-42', 'you-at-3am'][Math.floor(Math.random() * 5)];
+      currentTitle = title;
+      currentAuthor = author;
+      currentBranch = titleToBranch(title);
+      currentDiff = d;
+      $('pr-title').textContent = title;
+      $('pr-author').textContent = author;
+      $('pr-diff').innerHTML = `<span class="add">+${d.add}</span> <span class="del">−${d.del}</span>`;
+      updateBranchBar();
+      return d;
+    }
+
+    function setAgent(who, msg) {
+      $('agent-who').textContent = who;
+      $('agent-msg').textContent = msg;
+    }
+
+    function appendStoryLine(line, container) {
+      const el = document.createElement('div');
+      el.className = 'story-line';
+      el.innerHTML = `
+        <div class="story-avatar ${line.role}">${line.avatar}</div>
+        <div class="story-bubble">
+          <div class="story-who ${line.role}">${line.who}</div>
+          <div class="story-text">${line.text}</div>
+        </div>
+      `;
+      container.appendChild(el);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function updateChapter() {
+      let chapter = 'Chapter 1: The Mandate — merge or perish';
+      for (const beat of CHAPTERS) {
+        if (storySeen.has(beat.id)) chapter = beat.chapter;
+      }
+      $('story-chapter').textContent = chapter;
+    }
+
+    function saveStory() {
+      localStorage.setItem('yolo-story', JSON.stringify([...storySeen]));
+      updateChapter();
+    }
+
+    function advanceStory() {
+      const body = $('story-body');
+      if (storyIndex < storyQueue.length) {
+        appendStoryLine(storyQueue[storyIndex], body);
+        storyIndex++;
+        $('story-progress').textContent = storyIndex + ' / ' + storyQueue.length;
+        if (storyIndex === storyQueue.length) {
+          $('story-next').textContent = storyMode === 'intro' ? 'Start merging' : 'Continue';
+          $('story-next').classList.add('primary');
+        }
+        return;
+      }
+      $('story-overlay').classList.add('hidden');
+      $('story-next').textContent = 'Next';
+      $('story-next').classList.remove('primary');
+      if (storyOnDone) storyOnDone();
+      storyOnDone = null;
+    }
+
+    function startIntro(force = false) {
+      if (!force && localStorage.getItem(INTRO_STORAGE_KEY)) return;
+      storyMode = 'intro';
+      $('story-header-title').textContent = 'All-hands · Ship Faster Initiative';
+      $('story-body').innerHTML = '';
+      storyQueue = [...STORY_INTRO];
+      storyIndex = 0;
+      $('story-next').textContent = 'Next';
+      $('story-next').classList.remove('primary');
+      $('story-overlay').classList.remove('hidden');
+      storyOnDone = () => {
+        localStorage.setItem(INTRO_STORAGE_KEY, '1');
+        setAgent('Cursor Agent', 'The mandate is clear. Merge button. Go.');
+      };
+      advanceStory();
+    }
+
+    function replayIntro() {
+      localStorage.removeItem(INTRO_STORAGE_KEY);
+      startIntro(true);
+    }
+
+    function triggerStoryBeat(beat) {
+      if (storySeen.has(beat.id)) return;
+      storySeen.add(beat.id);
+      saveStory();
+      const last = beat.lines[beat.lines.length - 1];
+      setAgent(last.who, last.text);
+      storyMode = 'beat';
+      storyQueue = [...beat.lines];
+      storyIndex = 0;
+      $('story-header-title').textContent = 'Story · ' + (beat.chapter || 'Plot twist');
+      $('story-body').innerHTML = '';
+      $('story-overlay').classList.remove('hidden');
+      $('story-next').classList.remove('primary');
+      storyOnDone = null;
+      advanceStory();
+    }
+
+    function checkStoryBeats() {
+      if (!$('story-overlay').classList.contains('hidden')) return;
+      if (!localStorage.getItem(INTRO_STORAGE_KEY)) return;
+      for (const beat of STORY_BEATS) {
+        if (storySeen.has(beat.id)) continue;
+        const hit = beat.at != null ? prs >= beat.at : beat.test && beat.test();
+        if (hit) {
+          triggerStoryBeat(beat);
+          break;
+        }
+      }
+    }
+
+    function spawnFloat(x, y, text, cls) {
+      const el = document.createElement('div');
+      el.className = 'float ' + cls;
+      el.textContent = text;
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 850);
+    }
+
+    function playMerge() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.frequency.value = 520;
+        g.gain.value = 0.04;
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start();
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        o.stop(ctx.currentTime + 0.08);
+      } catch { /* ignore */ }
+    }
+
+    function playBuzzer() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.value = 90;
+        g.gain.value = 0.05;
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start();
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        o.stop(ctx.currentTime + 0.2);
+      } catch { /* ignore */ }
+    }
+
+    function playBadge() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [523, 659, 784].forEach((freq, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.frequency.value = freq;
+          g.gain.value = 0.05;
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.start(ctx.currentTime + i * 0.08);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.15);
+          o.stop(ctx.currentTime + i * 0.08 + 0.15);
+        });
+      } catch { /* ignore */ }
+    }
+
+    function getRole(count) {
+      let role = ROLES[0];
+      for (const r of ROLES) {
+        if (count >= r.at) role = r;
+      }
+      return role;
+    }
+
+    function updateRoleUi() {
+      const role = getRole(prs);
+      $('player-role-icon').textContent = role.icon;
+      $('player-role-title').textContent = role.title;
+    }
+
+    function showLevelUpToast(role, prev) {
+      $('level-toast-icon').textContent = role.icon;
+      $('level-toast-name').textContent = role.title;
+      $('level-toast-sub').textContent = prev.title + ' → ' + role.title;
+      const el = $('level-toast');
+      el.classList.remove('show');
+      void el.offsetWidth;
+      el.classList.add('show');
+      playBadge();
+      if (levelToastTimer) clearTimeout(levelToastTimer);
+      levelToastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function checkLevelUp() {
+      const role = getRole(prs);
+      if (role.at > lastRoleAt) {
+        const prev = getRole(lastRoleAt);
+        lastRoleAt = role.at;
+        if (role.at > 0) {
+          showLevelUpToast(role, prev);
+          fetchAgentLine('levelup', { role: role.title, prevRole: prev.title });
+        }
+      }
+      updateRoleUi();
+    }
+
+    function showBadgeToast(badge) {
+      $('badge-toast-icon').textContent = badge.icon;
+      $('badge-toast-name').textContent = badge.name;
+      $('badge-toast-reward').textContent = 'Reward: ' + badge.reward;
+      const el = $('badge-toast');
+      el.classList.remove('show');
+      void el.offsetWidth;
+      el.classList.add('show');
+      playBadge();
+      if (badgeToastTimer) clearTimeout(badgeToastTimer);
+      badgeToastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+    }
+
+    function unlockBadge(badge) {
+      unlockedBadges.add(badge.id);
+      localStorage.setItem('yolo-badges', JSON.stringify([...unlockedBadges]));
+      if (badge.apply) badge.apply();
+      showBadgeToast(badge);
+      fetchAgentLine('badge', { badgeName: badge.name });
+    }
+
+    function checkMilestones() {
+      for (const badge of BADGES) {
+        if (unlockedBadges.has(badge.id)) continue;
+        if (badge.test()) unlockBadge(badge);
+      }
+      renderBadges();
+    }
+
+    function recalcMergeMult() {
+      mergeMult = 1;
+      if (unlockedBadges.has('century')) mergeMult += 1;
+      if (unlockedBadges.has('lines_100k')) mergeMult += 2;
+      if (unlockedBadges.has('yolo_badge')) mergeMult += 10;
+    }
+
+    function renderBadges() {
+      const grid = $('badges-grid');
+      grid.innerHTML = '';
+      const strip = $('badges-strip');
+      const n = unlockedBadges.size;
+      strip.innerHTML = `<div class="badges-strip-label">Badges · ${n}/${BADGES.length}</div>`;
+
+      for (const b of BADGES) {
+        const got = unlockedBadges.has(b.id);
+        const el = document.createElement('div');
+        el.className = 'badge-card ' + (got ? 'unlocked' : 'locked');
+        el.innerHTML = `
+          <div class="icon">${got ? b.icon : '🔒'}</div>
+          <div class="name">${got ? b.name : '???'}</div>
+          <div class="desc">${b.desc}</div>
+        `;
+        grid.appendChild(el);
+
+        const chip = document.createElement('span');
+        chip.className = 'badge-chip' + (got ? ' unlocked' : '');
+        chip.title = b.desc + (got ? ' · ' + b.reward : ' — locked');
+        chip.innerHTML = `<span class="chip-icon">${got ? b.icon : '🔒'}</span>${got ? b.name : '???'}`;
+        strip.appendChild(chip);
+      }
+
+      $('badge-count').textContent = n + ' badge' + (n === 1 ? '' : 's');
+      $('badges-summary').textContent = n + '/' + BADGES.length;
+    }
+
+    function updateUi() {
+      $('stat-prs').textContent = fmt(prs);
+      $('stat-lines').textContent = fmt(lines);
+      $('stat-mps').textContent = mergesPerSec().toFixed(1);
+      $('stat-bots').textContent = getBots();
+      const mps = mergesPerSec();
+      $('merge-hint').textContent = mps > 5 ? '🔥 ' + mps.toFixed(1) + '/s' : '';
+      renderShop();
+      checkMilestones();
+      checkLevelUp();
+      checkStoryBeats();
+    }
+
+    function renderShop() {
+      const shop = $('shop');
+      shop.innerHTML = '';
+      for (const u of UPGRADES) {
+        const n = owned[u.id] || 0;
+        const cost = Math.floor(u.cost * Math.pow(1.2, n));
+        const el = document.createElement('div');
+        el.className = 'upgrade' + (prs < cost ? ' off' : '');
+        el.innerHTML = `<strong>${u.name}</strong> — ${fmt(cost)} PRs<small>${u.desc} · owned ${n}</small>`;
+        el.addEventListener('click', () => {
+          if (prs < cost) return;
+          prs -= cost;
+          owned[u.id] = n + 1;
+          setAgent('Cursor Agent', `Purchased ${u.name}. Velocity is a lifestyle.`);
+          updateUi();
+        });
+        shop.appendChild(el);
+      }
+    }
+
+    async function fetchAgentLine(action, extra = {}) {
+      if (Date.now() - lastAgentFetch < 600) return;
+      lastAgentFetch = Date.now();
+      const role = getRole(prs);
+      try {
+        const res = await fetch('/api/line', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action,
+            stats: {
+              prs,
+              lines,
+              mergesPerSec: mergesPerSec(),
+              role: extra.role || role.title,
+              prevRole: extra.prevRole || '',
+              badgeName: extra.badgeName || '',
+            },
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setAgent(data.title, data.message);
+          if (data.prTitle && action === 'merge') $('pr-title').textContent = data.prTitle;
+        }
+      } catch { /* offline */ }
+    }
+
+    function doMerge(e) {
+      mergeTimes.push(Date.now());
+      prs++;
+      prCounter++;
+      const mergedDiff = currentDiff;
+      pushMergedRow(prCounter, currentAuthor, currentBranch);
+      lines += Math.floor((mergedDiff.add + mergedDiff.del) * mergeMult);
+      newPrCard();
+      playMerge();
+
+      const btn = $('btn-merge');
+      let x = btn.getBoundingClientRect().left;
+      let y = btn.getBoundingClientRect().top;
+      if (e?.clientX) { x = e.clientX; y = e.clientY; }
+      spawnFloat(x, y - 20, '+1 PR', 'pr');
+      spawnFloat(x + 20, y - 35, '+' + mergedDiff.add, 'lines');
+
+      if (prs % 25 === 0) fetchAgentLine('merge');
+      else if (prs % 3 === 0 || Math.random() < 0.22) fetchAgentLine('merge');
+
+      updateUi();
+    }
+
+    function doWrong(action) {
+      if (action === 'reject') rejectCount++;
+      else reviewCount++;
+      playBuzzer();
+      document.body.classList.add('shake');
+      const flash = $('roast-flash');
+      flash.classList.remove('show');
+      void flash.offsetWidth;
+      flash.classList.add('show');
+      setTimeout(() => document.body.classList.remove('shake'), 300);
+
+      const pool = action === 'reject' ? REJECT_LINES : REVIEW_LINES;
+      const line = pool[Math.floor(Math.random() * pool.length)];
+      setAgent(line.who, line.msg);
+      fetchAgentLine(action);
+      checkMilestones();
+    }
+
+    $('btn-merge').addEventListener('click', doMerge);
+    $('btn-merge-pill').addEventListener('click', doMerge);
+    $('story-next').addEventListener('click', advanceStory);
+    $('replay-intro').addEventListener('click', replayIntro);
+    $('btn-reject').addEventListener('click', () => doWrong('reject'));
+    $('btn-review').addEventListener('click', () => doWrong('review'));
+
+    $('shop-toggle').addEventListener('click', () => {
+      $('shop-panel').classList.toggle('open');
+    });
+
+    $('badges-toggle').addEventListener('click', () => {
+      $('badges-panel').classList.toggle('open');
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!$('story-overlay').classList.contains('hidden')) {
+        if (e.code === 'Enter' || e.code === 'Space') {
+          e.preventDefault();
+          $('story-next').click();
+        }
+        return;
+      }
+      if (e.code === 'Space') { e.preventDefault(); doMerge(); }
+    });
+
+    setInterval(() => {
+      const pps = getPps();
+      if (pps <= 0) return;
+      for (let i = 0; i < pps / 10; i++) {
+        mergeTimes.push(Date.now());
+        prs++;
+        lines += Math.floor((20 + Math.floor(Math.random() * 100)) * mergeMult);
+      }
+      if (Math.random() < 0.12) newPrCard();
+      updateUi();
+    }, 100);
+
+    async function init() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        if (data.cursorConfigured && localStorage.getItem(INTRO_STORAGE_KEY)) {
+          setAgent('Cursor Agent', 'I generate PRs. You merge them. Symbiosis.');
+        }
+      } catch {
+        if (localStorage.getItem(INTRO_STORAGE_KEY)) {
+          setAgent('Cursor Agent', 'Offline mode. Still merge. Always merge.');
+        }
+      }
+      updateBranchBar();
+      recalcMergeMult();
+      renderBadges();
+      updateChapter();
+      startIntro();
+      updateUi();
+    }
+
+    init();
+  </script>
+</body>
+</html>
