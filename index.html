@@ -101,40 +101,6 @@
       color: var(--blue);
     }
 
-    .badges-strip {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      margin-top: 0.5rem;
-      padding-top: 0.5rem;
-      border-top: 1px solid var(--border);
-    }
-    .badges-strip-label {
-      width: 100%;
-      font-size: 0.62rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--dim);
-      margin-bottom: 0.15rem;
-    }
-    .badge-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      padding: 0.2rem 0.45rem;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      font-size: 0.65rem;
-      color: var(--dim);
-      background: rgba(0, 0, 0, 0.2);
-    }
-    .badge-chip.unlocked {
-      border-color: rgba(251, 191, 36, 0.35);
-      color: var(--gold);
-      background: rgba(251, 191, 36, 0.06);
-    }
-    .badge-chip .chip-icon { font-size: 0.85rem; }
-
     .replay-intro {
       padding: 0.2rem 0.5rem;
       border-radius: 6px;
@@ -620,12 +586,6 @@
     .roast-flash.show { animation: flash 0.45s ease; }
     @keyframes flash { 50% { opacity: 1; } }
 
-    .badge-count {
-      margin-left: auto;
-      font-size: 0.75rem;
-      color: var(--gold);
-    }
-
     .badge-toast {
       position: fixed;
       top: 1.5rem;
@@ -709,7 +669,7 @@
     }
 
     .badges-grid {
-      display: grid;
+      display: none;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 0.45rem;
       padding: 0 0.75rem 0.75rem;
@@ -922,7 +882,6 @@
     <div class="top-bar">
       <span class="top-pill">cursor-game <span class="chev"></span></span>
       <span class="top-pill"><span class="local-icon"></span> Local <span class="chev"></span></span>
-      <span class="badge-count" id="badge-count">0 badges</span>
     </div>
 
     <div class="context-panel">
@@ -946,9 +905,6 @@
           <button class="ctx-btn" id="btn-reject" type="button">Undo All</button>
           <button class="ctx-btn ctx-btn-primary" id="btn-review" type="button">Review</button>
         </div>
-      </div>
-      <div class="badges-strip" id="badges-strip">
-        <div class="badges-strip-label">Badges</div>
       </div>
     </div>
 
@@ -1002,7 +958,7 @@
       Merge to Prod <kbd>Space</kbd>
     </button>
 
-    <div class="shop-panel open" id="badges-panel">
+    <div class="shop-panel" id="badges-panel">
       <button class="shop-toggle" id="badges-toggle" type="button">
         <span class="shop-chev badges-chev">›</span> Badges <span id="badges-summary" style="color:var(--dim);margin-left:0.35rem">0/0</span>
       </button>
@@ -1018,7 +974,7 @@
   </div>
 
   <script>
-    const INTRO_STORAGE_KEY = 'yolo-intro-v2';
+    const INTRO_STORAGE_KEY = 'yolo-intro-v3';
 
     const PR_TITLES = [
       'fix: prod is on fire but smaller',
@@ -1491,9 +1447,7 @@
     function renderBadges() {
       const grid = $('badges-grid');
       grid.innerHTML = '';
-      const strip = $('badges-strip');
       const n = unlockedBadges.size;
-      strip.innerHTML = `<div class="badges-strip-label">Badges · ${n}/${BADGES.length}</div>`;
 
       for (const b of BADGES) {
         const got = unlockedBadges.has(b.id);
@@ -1505,15 +1459,8 @@
           <div class="desc">${b.desc}</div>
         `;
         grid.appendChild(el);
-
-        const chip = document.createElement('span');
-        chip.className = 'badge-chip' + (got ? ' unlocked' : '');
-        chip.title = b.desc + (got ? ' · ' + b.reward : ' — locked');
-        chip.innerHTML = `<span class="chip-icon">${got ? b.icon : '🔒'}</span>${got ? b.name : '???'}`;
-        strip.appendChild(chip);
       }
 
-      $('badge-count').textContent = n + ' badge' + (n === 1 ? '' : 's');
       $('badges-summary').textContent = n + '/' + BADGES.length;
     }
 
